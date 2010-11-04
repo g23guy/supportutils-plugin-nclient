@@ -1,0 +1,197 @@
+#!/bin/bash
+####################################################################
+# Name:        Supportconfig Plugin for the Novell Client for Linux
+# Description: Gathers Novell Client for Linux troubleshooting information
+# License:     GPLv2
+# Authors/Contributors:
+#              Jeremy Meldrum (jmeldrum@novell.com)
+#              Jason Record (jrecord@novell.com)
+# Modified:    2010 Nov 04
+####################################################################
+
+SVER=0.0.3
+RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
+PGCONF="/etc/opt/novell/nclient-plugin/nclient-plugin.conf"
+LOG_LINES=200	#0 means include the entire file
+LOG_LINES2=100
+export PATH="$PATH:/sbin:/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:/opt/novell/ncl/bin"
+
+[ -s $RCFILE ] && . $RCFILE || { echo "ERROR: Initializing resource file: $RCFILE"; exit 1; }
+[ -s $PGCONF ] && . $PGCONF || { echo "ERROR: Initializing configuration file: $PGCONF"; exit 2; }
+
+section_header "Supportconfig Plugin for iPrint, v${SVER}"
+plugin_message "Section 1: RPM Validation"
+plugin_message "Section 2: Rights Listing"
+plugin_message "Section 3: Static Directories"
+plugin_message "Section 4: File Output"
+plugin_message "Section 5: Miscellaneous Commands"
+plugin_message "Section 6: Log Output Files"
+plugin_message
+
+
+if [ -z "$EDIR_USERNAME" ]; then
+	plugin_tag "WARNING" "Run nClientInfo -h for additional information"
+	plugin_message "Secure commands will not be performed"; echo
+fi
+
+declare -a rpmArray
+
+#Labels
+RIGHTS_LABEL="Directory Listings"
+RPM_LABEL="RPM Check"
+COMM_LABEL="Command"
+LOG_LABEL="Log File"
+
+###################################################
+PackageValidation ()
+{
+	plugin_tag "Section #1" "RPM Validation"
+	echo "RPM Verify Key:"
+	
+	echo "Summary: Each of the 8 characters denotes the result of a comparison of attribute(s) of the file to the value of those attribute(s) recorded in the database."
+	echo "The (mnemonically emBoldened) character denotes failure of the corresponding --verify test:"
+	echo
+	echo ". Test passed"
+	echo "? Test not performed"
+	echo "S file Size differs"
+	echo "M Mode differs (includes permissions and file type)"
+	echo "5 MD5 sum differs"
+	echo "D Device major/minor number mismatch"
+	echo "L readLink(2) path mismatch"
+	echo "U User ownership differs"
+	echo "G Group ownership differ"
+	echo "T mTime differs"
+	echo
+	echo "c configuration file"
+	echo "d documentation file"
+	echo "g ghost file (file content is not included in the package payload)"
+	echo "l license file"
+	echo "r readme file"
+	echo
+
+	for i in $rpmArray; do
+		validate_rpm $i
+	done
+}
+###################################################
+ListRights ()
+{
+	plugin_tag "Section #2" "Rights Listings"
+	for i in $rpmArray; do
+		plugin_tag "RPM Check" "$i"
+		rpm -ql $i | xargs -d '\n' ls -ld; echo
+	done
+}
+###################################################
+#This function lists the rights of directories specific to nclient.
+ListRightsStatic ()
+{
+	plugin_tag "Section #3" "Static Directories"
+	pathsToList="/etc/opt/novell/ncl/ /opt/novell/ncl/bin/"
+	for pathVar in $pathsToList
+	do
+		plugin_tag "$RIGHTS_LABEL" "$pathVar"
+		ls -al $pathVar; echo
+		ls -aln $pathVar; echo
+	done
+
+	pathsToList="/var/opt/novell/nclmnt/"
+	for pathVar in $pathsToList
+	do
+		plugin_tag "$RIGHTS_LABEL" "$pathVar"	
+		ls -Rl $pathVar; echo
+	done
+
+	pathsToList="/var/opt/novell/log/ncl/"
+	for pathVar in $pathsToList
+	do
+		plugin_tag "$RIGHTS_LABEL" "$pathVar"
+		ls -alh $pathVar; echo
+	done
+}
+
+###################################################
+FileOutput ()
+{
+	plugin_tag "Section #4" "File Output"
+	
+	pconf_files "/opt/novell/ncl/bin/ncl_ver.txt /etc/novell-release /etc/SuSE-release /etc/hosts /etc/passwd /etc/group /etc/sysconfig/proxy /etc/pam.d/gdm /etc/pam.d/xdm"
+}
+
+###################################################
+MiscCommands ()
+{
+	plugin_tag "Section #5" "Miscellaneous Commands"
+	plugin_command 'rpm -qa --last | grep "novell-client\|novell-qtqui\|CASA"'	
+	
+	plugin_command 'ps -eaf | egrep "ncl\|novfsd"'
+	plugin_command "chkconfig -l novfsd"
+	plugin_command "/etc/init.d/novfsd status"
+	plugin_command "chkconfig -l novell-xregd"
+	plugin_command "/etc/init.d/novell-xregd status"
+	plugin_command "chkconfig -l micasad"
+	plugin_command "/etc/init.d/micasad status"
+	plugin_command "uname -a"
+	plugin_command "uptime"
+	
+	plugin_tag "$COMM_LABEL" "ifconfig | grep 'inet addr'"
+	ifconfig | grep "inet addr" | sed "s/^[ \t]*//"; echo
+
+	plugin_command "df -h"
+	plugin_command "free -k"
+	plugin_command "ps -eo pcpu,pid,user,args | sort -k 1 -r | head -10 | grep -e nClientInfo --invert-match"
+}
+
+
+###################################################
+LogOutput ()
+{
+	plugin_tag "Section #6" "Log Output Files"
+	
+	logFiles=""
+	if [ -d /var/opt/novell/log/ncl/ ]; then
+		logFiles="$logFiles $(find /var/opt/novell/log/ncl/ -type f)"
+	fi
+	plog_files $LOG_LINES $logFiles
+}
+
+checkPersistentCredentials ()
+{
+	if [ "$AUTH_PERSISTENT" != "true" ]; then
+cat <<PGCONF_EOF > $PGCONF
+EDIR_USERNAME=""
+EDIR_PASSWORD=""
+EDIR_SEARCH_BASE=""
+EDIR_LDAP_FQN=""
+AUTH_PERSISTENT="false"
+PGCONF_EOF
+	fi
+}
+
+###################################################
+QueryRPMs ()
+{
+	#Enters all of the installed nclient rpms into an array for use in another function.
+	tmpCASA=$(rpm -qa | grep CASA | sort)
+	
+	rpmArray="novell-client novell-qtgui-cli novell-qtgui novell-xtier-base $tmpCASA"
+}
+
+###################################################
+execCalls ()
+{
+	#Executes each of the functions
+	checkPersistentCredentials
+	QueryRPMs
+	PackageValidation
+	ListRights
+	ListRightsStatic
+	FileOutput
+	MiscCommands
+	LogOutput
+}
+###################################################
+
+	
+execCalls
+

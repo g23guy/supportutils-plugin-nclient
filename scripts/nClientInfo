@@ -1,0 +1,181 @@
+#!/bin/bash
+####################################################################
+# Name:        Supportconfig Plugin for the Novell Client for Linux
+# Description: Prompts for credentials and launches the Novell Client
+#              for Linux supportconfig plugin
+# License:     GPLv2
+# Authors/Contributors:
+#              Jeremy Meldrum (jmeldrum@novell.com)
+#              Jason Record (jrecord@novell.com)
+# Modified:    2010 Nov 04
+####################################################################
+
+clear
+SVER=0.0.2
+CONF_DIR="/etc/opt/novell/nclient-plugin"
+CONF_FILE="${CONF_DIR}/nclient-plugin.conf"
+OPT_AUTH_PERSISTENT=0
+BACKLINE_MODE=0
+SRNUM=0
+CURRENT_SCRIPT=$(basename $0)
+
+title ()
+{
+	echo "################################################################"
+	echo "#     Supportconfig Plugin for the Novell Client for Linux"
+	echo "#              Information Gathering Tool v${SVER}"
+	echo "################################################################"
+	echo
+}
+
+show_help() 
+{
+	#echo "Usage: $CURRENT_SCRIPT [-bhpP][-r SR_Number]"
+	echo "Usage: $CURRENT_SCRIPT [-bh][-r SR_Number]"
+	echo " -h   This screen"
+	echo " -b   Use backline mode"
+	#echo " -P   Set persistent eDirectory credentials"
+	#echo " -p   Clear previously set persistent eDirectory credentials"
+	echo " -r int" 
+	echo "      Includes your current 11 digit service request number"
+	echo
+}
+
+getCredentials ()
+{
+	if (( $OPT_AUTH_PERSISTENT )); then
+		AUTH_PERSISTENT="true"
+	fi
+	RCODE=1
+	while [ $RCODE -gt 0 ]
+	do
+		printf "%-40s " "Enter LDAP search base (ie o=Novell): "
+		read EDIR_SEARCH_BASE
+		if [ -z "$EDIR_SEARCH_BASE" ]; then
+			echo "ERROR: Empty LDAP search base"
+		else
+			RCODE=0
+		fi
+	done
+
+	#RCODE=1
+	#while [ $RCODE -gt 0 ]
+	#do
+	printf "%-40s " "FQN in dot notation (ie admin.novell):"
+	read EDIR_USERNAME
+	printf "%-40s " "Enter the $EDIR_USERNAME Password:"
+	read -s EDIR_PASSWORD
+	ndslogin -p $EDIR_PASSWORD $EDIR_USERNAME
+	RCODE=$?
+	echo
+	if [ $RCODE -gt 0 ]; then
+		#echo "ERROR: ndslogin Failed for username $EDIR_USERNAME"
+		tmplength=$(echo $EDIR_USERNAME | tr -dc '.' | wc -c )
+		context_length=`expr $tmplength + 1`	
+		cName=$(echo $EDIR_USERNAME | cut -d. -f1 )
+		orgName=$(echo $EDIR_USERNAME | cut -d. -f$context_length )
+		
+		#concatenates  the FQN together		
+		if [ $tmplength = "1" ]; then 	    
+			EDIR_LDAP_FQN="cn=${cName},o=${orgName}"
+		else
+	        	ouName=$(echo $EDIR_USERNAME | cut -d. -f2-$tmplength | sed 's/\./,ou\=/g')		    
+	        	EDIR_LDAP_FQN="cn=${cName},ou=${ouName},o=${orgName}" 	    
+		fi				
+	else
+		
+		EDIR_LDAP_FQN=$(ndslogin -p $EDIR_PASSWORD $EDIR_USERNAME | grep "eDirectory Login" | awk '{print $NF}' | sed -e 's/^\.//;s/\.$//;s/\./,/g')
+		EDIR_TREE=$(echo $EDIR_LDAP_FQN | awk -F, '{print $NF}')
+		EDIR_LDAP_FQN=$(echo $EDIR_LDAP_FQN | sed -e "s/,$EDIR_TREE//")
+
+	fi
+	mkdir -p $CONF_DIR
+	echo "EDIR_USERNAME=\"${EDIR_USERNAME}\"" > $CONF_FILE
+	echo "EDIR_PASSWORD=\"${EDIR_PASSWORD}\"" >> $CONF_FILE
+	echo "EDIR_SEARCH_BASE=\"${EDIR_SEARCH_BASE}\"" >> $CONF_FILE
+	echo "EDIR_LDAP_FQN=\"${EDIR_LDAP_FQN}\"" >> $CONF_FILE
+	echo "AUTH_PERSISTENT=\"$AUTH_PERSISTENT\"" >> $CONF_FILE
+	chmod 0700 $CONF_DIR
+	chmod 0600 $CONF_FILE
+	chown -R root.root $CONF_DIR
+	echo "Supportconfig Plugin for Novell Client Configured"
+	#done
+}
+
+gatherInfo ()
+{
+	if [ $BACKLINE_MODE -eq 1 ]; then
+		if [ $SRNUM -gt 0 ]; then
+			BACKLINE_FILE="`pwd`/`uname -n`-${CURRENT_SCRIPT}-${SVER}`date +-%Y-%m%d-%H%M`-SR${SRNUM}.txt"
+		else
+			BACKLINE_FILE="`pwd`/`uname -n`-${CURRENT_SCRIPT}-${SVER}`date +-%Y-%m%d-%H%M`.txt"
+		fi		
+		printf "%-40s " "Gathering Novell Client Information:"
+		/usr/lib/supportconfig/plugins/ncl &> $BACKLINE_FILE
+		echo Done
+		printf "%-40s %s\n\n" "Novell Client Info File:" $BACKLINE_FILE
+	else
+		if [ $SRNUM -gt 0 ]; then
+			supportconfig -ur $SRNUM
+		else
+			supportconfig -u
+		fi
+	fi	
+}
+
+#################################################################
+# main
+#################################################################
+clear
+title
+
+CURRENTUID=$(id -u)
+if [ $CURRENTUID -ne 0 ]; then
+	echo "ERROR: You must be logged in as root."
+	echo "       $(id)"
+	echo
+	show_help
+	exit 3
+fi
+
+
+[ -s $CONF_FILE ] && . $CONF_FILE
+while getopts :bhPpr: TMPOPT
+do
+	case $TMPOPT in
+	\:)	case $OPTARG in
+			*) echo "ERROR: Missing Argument -$OPTARG"
+				;;
+			esac
+			echo; show_help; exit 1 ;;
+	\?)	case $OPTARG in
+			*) echo "ERROR: Invalid Option -$OPTARG"
+				;;
+			esac
+			echo; show_help; exit 2 ;;
+	h) show_help; exit 0 ;;
+	r) SRNUM="$OPTARG" ;;
+	P) OPT_AUTH_PERSISTENT=1 ;;
+	p) AUTH_PERSISTENT="false" ;;
+	b) BACKLINE_MODE=1 ;;
+	esac
+done
+
+if [ $SRNUM -gt 0 ]; then
+	printf "%-40s %s\n" "Service Request Number:" "$SRNUM"
+else
+	printf "%-40s %s\n" "Service Request Number:" "Missing, use -r"
+fi
+if [ "$AUTH_PERSISTENT" = "true" ]; then
+	printf "%-40s %s\n" "Authentication Credentials:" "Persistent"
+	gatherInfo
+else
+	if [ $OPT_AUTH_PERSISTENT -eq 1 ]; then
+		printf "%-40s %s\n" "Authentication Credentials:" "Setting Persistent"
+	else
+		printf "%-40s %s\n" "Authentication Credentials:" "Single Use"
+	fi
+#	getCredentials
+	gatherInfo
+fi
+

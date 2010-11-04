@@ -1,0 +1,25 @@
+.TH iprint-plugin "8" "04 Nov 2010" "iprint-plugin" "Support Utilities Manual"
+.SH NAME
+iprint-plugin \- Novell iPrint Plugin for 
+.BR supportconfig (8)
+.
+.SH DESCRIPTION
+Supportconfig plugins add functionality to the supportconfig script. This plugin extends supportconfig's functionality to include Novell's iPrint
+information. Supportconfig saves the plugin output as plugin-iPrint.txt. Use 
+.BR iPrintInfo (8)
+to get eDirectory credentials and launch supportconfig.
+
+.SH FILES
+.I /usr/lib/supportconfig/plugins/iPrint
+.RS
+The iPrint plugin
+.RE
+.SH AUTHOR
+Jason Record <jrecord@novell.com>
+.SH REPORTING BUGS
+Please submit bug fixes, comments or enhancement requests via: 
+.B http://code.google.com/p/supportutils-plugin-iprint/issues/list
+.SH SEE ALSO
+.BR supportconfig (8)
+.BR supportconfig.conf (5)
+.BR iPrintInfo (8)

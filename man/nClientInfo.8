@@ -1,0 +1,49 @@
+.TH nClientInfo "8" "04 Nov 2010" "nClientInfo" "Support Utilities Manual"
+.SH NAME
+nClientInfo \- Novell iPrint Plugin launcher for 
+.BR supportconfig (8)
+.
+.SH SYNOPSIS
+nClientInfo [\fIOPTIONS\fR]
+
+.SH DESCRIPTION
+Prompts for eDirectory credentials used in gathering additional troubleshooting information and then launches the Supportconfig iPrint Plugin. The information will automatically be uploaded to Novell's public FTP server. Back line mode will not run 
+.BR supportconfig (8),
+and therefore will not automatically upload data to Novell. 
+
+.SH OPTIONS
+.TP
+\fB\-h\fR
+This screen
+.TP
+\fB\-b\fR
+Use backline mode. Runs the Supportconfig iPrint Plugin independent of supportconfig. The information is saved in a local file and not uploaded to Novell.
+.TP
+\fB\-P\fR
+Set persistent eDirectory credentials
+.TP
+\fB\-p\fR
+Clear previously set persistent eDirectory credentials
+.TP
+\fB\-r\fR \fIint\fR
+Includes your current 11 digit Novell service request number
+.SH FILES
+.I /sbin/nClientInfo
+.RS
+The iPrint plugin launcher
+.RE
+.I /etc/opt/novell/iprint-plugin/iprint-plugin.conf
+.RS
+The iPrint plugin configuration file containing the eDirectory credentials, either temporarily or persistently.
+.RE
+.SH AUTHOR
+Jason Record <jrecord@novell.com>
+.P
+Jeremy Meldrum <jmeldrum@novell.com>
+.SH REPORTING BUGS
+Please submit bug fixes, comments or enhancement requests via: 
+.B http://code.google.com/p/supportutils-plugin-iprint/issues/list
+.SH SEE ALSO
+.BR supportconfig (8)
+.BR supportconfig.conf (5)
+.BR nclient-plugin (8)

@@ -7,11 +7,11 @@
 # Authors/Contributors:
 #              Jeremy Meldrum (jmeldrum@novell.com)
 #              Jason Record (jrecord@novell.com)
-# Modified:    2010 Nov 04
+# Modified:    2010 Nov 06
 ####################################################################
 
 clear
-SVER=0.0.2
+SVER=0.0.3
 CONF_DIR="/etc/opt/novell/nclient-plugin"
 CONF_FILE="${CONF_DIR}/nclient-plugin.conf"
 OPT_AUTH_PERSISTENT=0
@@ -167,14 +167,14 @@ else
 	printf "%-40s %s\n" "Service Request Number:" "Missing, use -r"
 fi
 if [ "$AUTH_PERSISTENT" = "true" ]; then
-	printf "%-40s %s\n" "Authentication Credentials:" "Persistent"
+#	printf "%-40s %s\n" "Authentication Credentials:" "Persistent"
 	gatherInfo
 else
-	if [ $OPT_AUTH_PERSISTENT -eq 1 ]; then
-		printf "%-40s %s\n" "Authentication Credentials:" "Setting Persistent"
-	else
-		printf "%-40s %s\n" "Authentication Credentials:" "Single Use"
-	fi
+#	if [ $OPT_AUTH_PERSISTENT -eq 1 ]; then
+#		printf "%-40s %s\n" "Authentication Credentials:" "Setting Persistent"
+#	else
+#		printf "%-40s %s\n" "Authentication Credentials:" "Single Use"
+#	fi
 #	getCredentials
 	gatherInfo
 fi

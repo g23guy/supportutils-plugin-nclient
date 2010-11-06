@@ -6,10 +6,10 @@
 # Authors/Contributors:
 #              Jeremy Meldrum (jmeldrum@novell.com)
 #              Jason Record (jrecord@novell.com)
-# Modified:    2010 Nov 04
+# Modified:    2010 Nov 06
 ####################################################################
 
-SVER=0.0.3
+SVER=0.0.5
 RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
 PGCONF="/etc/opt/novell/nclient-plugin/nclient-plugin.conf"
 LOG_LINES=200	#0 means include the entire file
@@ -28,11 +28,6 @@ plugin_message "Section 5: Miscellaneous Commands"
 plugin_message "Section 6: Log Output Files"
 plugin_message
 
-
-if [ -z "$EDIR_USERNAME" ]; then
-	plugin_tag "WARNING" "Run nClientInfo -h for additional information"
-	plugin_message "Secure commands will not be performed"; echo
-fi
 
 declare -a rpmArray
 
@@ -69,9 +64,14 @@ PackageValidation ()
 	echo "r readme file"
 	echo
 
+	tmpRpmArray=""
 	for i in $rpmArray; do
 		validate_rpm $i
+		if rpm -q $i &>/dev/null; then
+			tmpRpmArray="$tmpRpmArray $i"
+		fi
 	done
+	rpmArray=$tmpRpmArray
 }
 ###################################################
 ListRights ()
@@ -91,8 +91,10 @@ ListRightsStatic ()
 	for pathVar in $pathsToList
 	do
 		plugin_tag "$RIGHTS_LABEL" "$pathVar"
-		ls -al $pathVar; echo
-		ls -aln $pathVar; echo
+		if ls -al $pathVar; then
+			echo; ls -aln $pathVar
+		fi
+		echo
 	done
 
 	pathsToList="/var/opt/novell/nclmnt/"
@@ -123,7 +125,7 @@ MiscCommands ()
 {
 	plugin_tag "Section #5" "Miscellaneous Commands"
 	plugin_command 'rpm -qa --last | grep "novell-client\|novell-qtqui\|CASA"'	
-	
+	plugin_command "rpm -q --last $rpmArray"
 	plugin_command 'ps -eaf | egrep "ncl\|novfsd"'
 	plugin_command "chkconfig -l novfsd"
 	plugin_command "/etc/init.d/novfsd status"
@@ -174,14 +176,14 @@ QueryRPMs ()
 	#Enters all of the installed nclient rpms into an array for use in another function.
 	tmpCASA=$(rpm -qa | grep CASA | sort)
 	
-	rpmArray="novell-client novell-qtgui-cli novell-qtgui novell-xtier-base $tmpCASA"
+	rpmArray="nici nici64 novell-client novell-client-script novell-konqueror-plugin novell-nautilus-plugin novell-nmasclient novell-novfsd novell-qtgui novell-qtgui-cli novell-ui-base novell-xplatlib novell-xtier-base novell-xtier-core novell-xtier-xplat yast2-novell-client $tmpCASA"
 }
 
 ###################################################
 execCalls ()
 {
 	#Executes each of the functions
-	checkPersistentCredentials
+#	checkPersistentCredentials
 	QueryRPMs
 	PackageValidation
 	ListRights
